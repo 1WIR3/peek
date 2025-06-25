@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Repository Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .search-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .results {
+                grid-template-columns: 1fr;
+            }
+            .input-group {
+                flex-direction: column;
+            }
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .dependency-item, .fork-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .dependency-item:hover, .fork-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .dependency-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .dependency-version {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .fork-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .fork-info {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .fork-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .fork-link:hover {
+            text-decoration: underline;
+        }
+
+        .fork-tree {
+            margin-left: 20px;
+            border-left: 2px solid #e1e5e9;
+            padding-left: 15px;
+            margin-top: 10px;
+        }
+
+        .no-data {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .error {
+            background: #fff5f5;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #c53030;
+            margin-bottom: 20px;
+        }
+
+        .repo-info {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            grid-column: 1 / -1;
+        }
+
+        .repo-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 GitHub Repository Analyzer</h1>
+            <p>Discover dependencies and explore fork networks</p>
+        </div>
+
+        <div class="search-container">
+            <div class="input-group">
+                <input type="text" id="repoInput" placeholder="Enter GitHub repository (e.g., facebook/react)" />
+                <button onclick="analyzeRepo()" id="analyzeBtn">Analyze</button>
+            </div>
+            <p style="color: #666; font-size: 0.9rem;">
+                Enter a repository in the format: owner/repo-name<br>
+                <span style="color: #FF6B6B; font-weight: 500;">Note: Running in demo mode with mock data. Deploy to GitHub Pages for real API data!</span>
+            </p>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing repository...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="results" class="results" style="display: none;">
+            <div id="repoInfo" class="repo-info"></div>
+            <div class="section">
+                <h2>📦 Dependencies</h2>
+                <div id="dependencies"></div>
+            </div>
+            <div class="section">
+                <h2>🍴 Fork Network</h2>
+                <div id="forks"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let repoData = {};
+        
+        async function analyzeRepo() {
+            const repoInput = document.getElementById('repoInput').value.trim();
+            if (!repoInput) return;
+
+            const [owner, repo] = repoInput.split('/');
+            if (!owner || !repo) {
+                showError('Please enter a valid repository format: owner/repo-name');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+
+            try {
+                // Check if we're running in Claude (CSP blocked) vs GitHub Pages
+                const isClaudeEnvironment = window.location.hostname.includes('claude') || 
+                                          window.location.hostname.includes('anthropic');
+                
+                if (isClaudeEnvironment) {
+                    // Use mock data for demonstration in Claude
+                    const mockData = getMockData(owner, repo);
+                    displayResults(mockData.repoInfo, mockData.dependencies, mockData.forks);
+                } else {
+                    // Use real GitHub API for GitHub Pages deployment
+                    const repoInfo = await fetchRepoInfo(owner, repo);
+                    repoData = repoInfo;
+
+                    const [dependencies, forks] = await Promise.all([
+                        fetchDependencies(owner, repo),
+                        fetchForks(owner, repo)
+                    ]);
+
+                    displayResults(repoInfo, dependencies, forks);
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function getMockData(owner, repo) {
+            return {
+                repoInfo: {
+                    full_name: `${owner}/${repo}`,
+                    description: `Demo data for ${repo} - this shows how the analyzer works. Deploy to GitHub Pages for real data!`,
+                    stargazers_count: Math.floor(Math.random() * 50000) + 1000,
+                    forks_count: Math.floor(Math.random() * 5000) + 100,
+                    watchers_count: Math.floor(Math.random() * 1000) + 50,
+                    language: ['JavaScript', 'Python', 'TypeScript', 'Go', 'Rust'][Math.floor(Math.random() * 5)]
+                },
+                dependencies: [
+                    { name: 'react', version: '^18.2.0', type: 'dependency' },
+                    { name: 'axios', version: '^1.6.0', type: 'dependency' },
+                    { name: 'lodash', version: '^4.17.21', type: 'dependency' },
+                    { name: 'typescript', version: '^5.0.0', type: 'devDependency' },
+                    { name: 'webpack', version: '^5.88.0', type: 'devDependency' },
+                    { name: 'jest', version: '^29.5.0', type: 'devDependency' },
+                    { name: 'requests', version: '>=2.25.1', type: 'python' },
+                    { name: 'numpy', version: '>=1.21.0', type: 'python' }
+                ],
+                forks: [
+                    {
+                        name: `awesome-dev/${repo}-enhanced`,
+                        owner: 'awesome-dev',
+                        repo: `${repo}-enhanced`,
+                        stars: Math.floor(Math.random() * 500) + 50,
+                        url: `https://github.com/awesome-dev/${repo}-enhanced`,
+                        updated: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000),
+                        children: [
+                            {
+                                name: `contributor1/${repo}-fork`,
+                                stars: Math.floor(Math.random() * 50) + 5,
+                                url: `https://github.com/contributor1/${repo}-fork`,
+                                updated: new Date(Date.now() - Math.random() * 180 * 24 * 60 * 60 * 1000)
+                            }
+                        ]
+                    },
+                    {
+                        name: `company-x/${repo}-customized`,
+                        owner: 'company-x',
+                        repo: `${repo}-customized`,
+                        stars: Math.floor(Math.random() * 200) + 20,
+                        url: `https://github.com/company-x/${repo}-customized`,
+                        updated: new Date(Date.now() - Math.random() * 200 * 24 * 60 * 60 * 1000),
+                        children: []
+                    },
+                    {
+                        name: `open-source-fan/${repo}`,
+                        owner: 'open-source-fan',
+                        repo: repo,
+                        stars: Math.floor(Math.random() * 100) + 10,
+                        url: `https://github.com/open-source-fan/${repo}`,
+                        updated: new Date(Date.now() - Math.random() * 100 * 24 * 60 * 60 * 1000),
+                        children: [
+                            {
+                                name: `student1/${repo}-learning`,
+                                stars: Math.floor(Math.random() * 20) + 1,
+                                url: `https://github.com/student1/${repo}-learning`,
+                                updated: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000)
+                            },
+                            {
+                                name: `developer2/${repo}-experiments`,
+                                stars: Math.floor(Math.random() * 30) + 2,
+                                url: `https://github.com/developer2/${repo}-experiments`,
+                                updated: new Date(Date.now() - Math.random() * 120 * 24 * 60 * 60 * 1000)
+                            }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        async function fetchRepoInfo(owner, repo) {
+            const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+            if (!response.ok) {
+                throw new Error(`Repository not found: ${owner}/${repo}`);
+            }
+            return await response.json();
+        }
+
+        async function fetchDependencies(owner, repo) {
+            const dependencies = [];
+            
+            // Try to fetch package.json for npm dependencies
+            try {
+                const packageResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/package.json`);
+                if (packageResponse.ok) {
+                    const packageData = await packageResponse.json();
+                    const packageJson = JSON.parse(atob(packageData.content));
+                    
+                    if (packageJson.dependencies) {
+                        Object.entries(packageJson.dependencies).forEach(([name, version]) => {
+                            dependencies.push({ name, version, type: 'dependency' });
+                        });
+                    }
+                    
+                    if (packageJson.devDependencies) {
+                        Object.entries(packageJson.devDependencies).forEach(([name, version]) => {
+                            dependencies.push({ name, version, type: 'devDependency' });
+                        });
+                    }
+                }
+            } catch (e) {
+                // Ignore if package.json doesn't exist
+            }
+
+            // Try to fetch requirements.txt for Python dependencies
+            try {
+                const reqResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/requirements.txt`);
+                if (reqResponse.ok) {
+                    const reqData = await reqResponse.json();
+                    const requirements = atob(reqData.content).split('\n');
+                    
+                    requirements.forEach(req => {
+                        req = req.trim();
+                        if (req && !req.startsWith('#')) {
+                            const parts = req.split(/[>=<]/);
+                            const name = parts[0].trim();
+                            const version = parts.length > 1 ? req.substring(name.length) : '';
+                            dependencies.push({ name, version, type: 'python' });
+                        }
+                    });
+                }
+            } catch (e) {
+                // Ignore if requirements.txt doesn't exist
+            }
+
+            return dependencies;
+        }
+
+        async function fetchForks(owner, repo) {
+            const forks = [];
+            let page = 1;
+            const perPage = 30;
+
+            while (forks.length < 100 && page <= 3) { // Limit to avoid rate limiting
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/forks?page=${page}&per_page=${perPage}&sort=stargazers_count`);
+                if (!response.ok) break;
+
+                const pageData = await response.json();
+                if (pageData.length === 0) break;
+
+                for (const fork of pageData) {
+                    const forkData = {
+                        name: fork.full_name,
+                        owner: fork.owner.login,
+                        repo: fork.name,
+                        stars: fork.stargazers_count,
+                        url: fork.html_url,
+                        updated: new Date(fork.updated_at),
+                        children: []
+                    };
+
+                    // Fetch forks of forks (limit to avoid too many requests)
+                    if (forks.length < 20) {
+                        try {
+                            const subForks = await fetchSubForks(fork.owner.login, fork.name);
+                            forkData.children = subForks;
+                        } catch (e) {
+                            // Continue if sub-forks can't be fetched
+                        }
+                    }
+
+                    forks.push(forkData);
+                }
+
+                page++;
+            }
+
+            return forks.sort((a, b) => b.stars - a.stars);
+        }
+
+        async function fetchSubForks(owner, repo) {
+            try {
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/forks?per_page=10&sort=stargazers_count`);
+                if (!response.ok) return [];
+
+                const subForks = await response.json();
+                return subForks.map(fork => ({
+                    name: fork.full_name,
+                    stars: fork.stargazers_count,
+                    url: fork.html_url,
+                    updated: new Date(fork.updated_at)
+                }));
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function displayResults(repoInfo, dependencies, forks) {
+            displayRepoInfo(repoInfo);
+            displayDependencies(dependencies);
+            displayForks(forks);
+            document.getElementById('results').style.display = 'grid';
+        }
+
+        function displayRepoInfo(repo) {
+            const repoInfoDiv = document.getElementById('repoInfo');
+            repoInfoDiv.innerHTML = `
+                <h2>📊 ${repo.full_name}</h2>
+                <p style="margin: 10px 0; color: #666;">${repo.description || 'No description available'}</p>
+                <div class="repo-stats">
+                    <div class="stat">
+                        <div class="stat-value">⭐ ${repo.stargazers_count.toLocaleString()}</div>
+                        <div class="stat-label">Stars</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">🍴 ${repo.forks_count.toLocaleString()}</div>
+                        <div class="stat-label">Forks</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">👁️ ${repo.watchers_count.toLocaleString()}</div>
+                        <div class="stat-label">Watchers</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${repo.language || 'Unknown'}</div>
+                        <div class="stat-label">Language</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayDependencies(dependencies) {
+            const depsDiv = document.getElementById('dependencies');
+            
+            if (dependencies.length === 0) {
+                depsDiv.innerHTML = '<div class="no-data">No dependencies found (or dependency files not accessible)</div>';
+                return;
+            }
+
+            const depsByType = dependencies.reduce((acc, dep) => {
+                if (!acc[dep.type]) acc[dep.type] = [];
+                acc[dep.type].push(dep);
+                return acc;
+            }, {});
+
+            let html = '';
+            Object.entries(depsByType).forEach(([type, deps]) => {
+                const typeLabel = {
+                    'dependency': '📦 Dependencies',
+                    'devDependency': '🛠️ Dev Dependencies',
+                    'python': '🐍 Python Requirements'
+                }[type] || type;
+
+                html += `<h3 style="margin: 20px 0 10px 0; color: #667eea;">${typeLabel}</h3>`;
+                deps.forEach(dep => {
+                    html += `
+                        <div class="dependency-item">
+                            <div class="dependency-name">${dep.name}</div>
+                            <div class="dependency-version">${dep.version}</div>
+                        </div>
+                    `;
+                });
+            });
+
+            depsDiv.innerHTML = html;
+        }
+
+        function displayForks(forks) {
+            const forksDiv = document.getElementById('forks');
+            
+            if (forks.length === 0) {
+                forksDiv.innerHTML = '<div class="no-data">No forks found</div>';
+                return;
+            }
+
+            let html = '';
+            forks.forEach(fork => {
+                html += `
+                    <div class="fork-item">
+                        <div class="fork-name">
+                            <a href="${fork.url}" target="_blank" class="fork-link">${fork.name}</a>
+                        </div>
+                        <div class="fork-info">
+                            ⭐ ${fork.stars} stars • Updated: ${fork.updated.toLocaleDateString()}
+                        </div>
+                        ${fork.children.length > 0 ? `
+                            <div class="fork-tree">
+                                <strong>Forks of this fork:</strong>
+                                ${fork.children.map(child => `
+                                    <div style="margin-top: 5px;">
+                                        <a href="${child.url}" target="_blank" class="fork-link">${child.name}</a>
+                                        <span style="color: #666;"> (⭐ ${child.stars})</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            forksDiv.innerHTML = html;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('analyzeBtn').disabled = show;
+            if (!show) document.getElementById('results').style.display = 'none';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        // Allow Enter key to trigger analysis
+        document.getElementById('repoInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                analyzeRepo();
+            }
+        });
+    </script>
+</body>
+</html>
