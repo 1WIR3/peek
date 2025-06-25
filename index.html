@@ -262,10 +262,7 @@
                 <input type="text" id="repoInput" placeholder="Enter GitHub repository (e.g., facebook/react)" />
                 <button onclick="analyzeRepo()" id="analyzeBtn">Analyze</button>
             </div>
-            <p style="color: #666; font-size: 0.9rem;">
-                Enter a repository in the format: owner/repo-name<br>
-                <span style="color: #FF6B6B; font-weight: 500;">Note: Running in demo mode with mock data. Deploy to GitHub Pages for real API data!</span>
-            </p>
+            <p style="color: #666; font-size: 0.9rem;">Enter a repository in the format: owner/repo-name</p>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
@@ -305,103 +302,22 @@
             hideError();
 
             try {
-                // Check if we're running in Claude (CSP blocked) vs GitHub Pages
-                const isClaudeEnvironment = window.location.hostname.includes('claude') || 
-                                          window.location.hostname.includes('anthropic');
-                
-                if (isClaudeEnvironment) {
-                    // Use mock data for demonstration in Claude
-                    const mockData = getMockData(owner, repo);
-                    displayResults(mockData.repoInfo, mockData.dependencies, mockData.forks);
-                } else {
-                    // Use real GitHub API for GitHub Pages deployment
-                    const repoInfo = await fetchRepoInfo(owner, repo);
-                    repoData = repoInfo;
+                // Fetch repository info
+                const repoInfo = await fetchRepoInfo(owner, repo);
+                repoData = repoInfo;
 
-                    const [dependencies, forks] = await Promise.all([
-                        fetchDependencies(owner, repo),
-                        fetchForks(owner, repo)
-                    ]);
+                // Fetch dependencies and forks in parallel
+                const [dependencies, forks] = await Promise.all([
+                    fetchDependencies(owner, repo),
+                    fetchForks(owner, repo)
+                ]);
 
-                    displayResults(repoInfo, dependencies, forks);
-                }
+                displayResults(repoInfo, dependencies, forks);
             } catch (error) {
                 showError(error.message);
             } finally {
                 showLoading(false);
             }
-        }
-
-        function getMockData(owner, repo) {
-            return {
-                repoInfo: {
-                    full_name: `${owner}/${repo}`,
-                    description: `Demo data for ${repo} - this shows how the analyzer works. Deploy to GitHub Pages for real data!`,
-                    stargazers_count: Math.floor(Math.random() * 50000) + 1000,
-                    forks_count: Math.floor(Math.random() * 5000) + 100,
-                    watchers_count: Math.floor(Math.random() * 1000) + 50,
-                    language: ['JavaScript', 'Python', 'TypeScript', 'Go', 'Rust'][Math.floor(Math.random() * 5)]
-                },
-                dependencies: [
-                    { name: 'react', version: '^18.2.0', type: 'dependency' },
-                    { name: 'axios', version: '^1.6.0', type: 'dependency' },
-                    { name: 'lodash', version: '^4.17.21', type: 'dependency' },
-                    { name: 'typescript', version: '^5.0.0', type: 'devDependency' },
-                    { name: 'webpack', version: '^5.88.0', type: 'devDependency' },
-                    { name: 'jest', version: '^29.5.0', type: 'devDependency' },
-                    { name: 'requests', version: '>=2.25.1', type: 'python' },
-                    { name: 'numpy', version: '>=1.21.0', type: 'python' }
-                ],
-                forks: [
-                    {
-                        name: `awesome-dev/${repo}-enhanced`,
-                        owner: 'awesome-dev',
-                        repo: `${repo}-enhanced`,
-                        stars: Math.floor(Math.random() * 500) + 50,
-                        url: `https://github.com/awesome-dev/${repo}-enhanced`,
-                        updated: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000),
-                        children: [
-                            {
-                                name: `contributor1/${repo}-fork`,
-                                stars: Math.floor(Math.random() * 50) + 5,
-                                url: `https://github.com/contributor1/${repo}-fork`,
-                                updated: new Date(Date.now() - Math.random() * 180 * 24 * 60 * 60 * 1000)
-                            }
-                        ]
-                    },
-                    {
-                        name: `company-x/${repo}-customized`,
-                        owner: 'company-x',
-                        repo: `${repo}-customized`,
-                        stars: Math.floor(Math.random() * 200) + 20,
-                        url: `https://github.com/company-x/${repo}-customized`,
-                        updated: new Date(Date.now() - Math.random() * 200 * 24 * 60 * 60 * 1000),
-                        children: []
-                    },
-                    {
-                        name: `open-source-fan/${repo}`,
-                        owner: 'open-source-fan',
-                        repo: repo,
-                        stars: Math.floor(Math.random() * 100) + 10,
-                        url: `https://github.com/open-source-fan/${repo}`,
-                        updated: new Date(Date.now() - Math.random() * 100 * 24 * 60 * 60 * 1000),
-                        children: [
-                            {
-                                name: `student1/${repo}-learning`,
-                                stars: Math.floor(Math.random() * 20) + 1,
-                                url: `https://github.com/student1/${repo}-learning`,
-                                updated: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000)
-                            },
-                            {
-                                name: `developer2/${repo}-experiments`,
-                                stars: Math.floor(Math.random() * 30) + 2,
-                                url: `https://github.com/developer2/${repo}-experiments`,
-                                updated: new Date(Date.now() - Math.random() * 120 * 24 * 60 * 60 * 1000)
-                            }
-                        ]
-                    }
-                ]
-            };
         }
 
         async function fetchRepoInfo(owner, repo) {
@@ -467,50 +383,38 @@
             let page = 1;
             const perPage = 30;
 
-            try {
-                while (forks.length < 100 && page <= 3) { // Limit to avoid rate limiting
-                    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/forks?page=${page}&per_page=${perPage}&sort=stargazers_count`);
-                    
-                    if (!response.ok) {
-                        // If first page fails, check if it's a permissions/settings issue
-                        if (page === 1) {
-                            console.log(`Forks API returned ${response.status} - repository may have restricted fork access or no forks`);
+            while (forks.length < 100 && page <= 3) { // Limit to avoid rate limiting
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/forks?page=${page}&per_page=${perPage}&sort=stargazers_count`);
+                if (!response.ok) break;
+
+                const pageData = await response.json();
+                if (pageData.length === 0) break;
+
+                for (const fork of pageData) {
+                    const forkData = {
+                        name: fork.full_name,
+                        owner: fork.owner.login,
+                        repo: fork.name,
+                        stars: fork.stargazers_count,
+                        url: fork.html_url,
+                        updated: new Date(fork.updated_at),
+                        children: []
+                    };
+
+                    // Fetch forks of forks (limit to avoid too many requests)
+                    if (forks.length < 20) {
+                        try {
+                            const subForks = await fetchSubForks(fork.owner.login, fork.name);
+                            forkData.children = subForks;
+                        } catch (e) {
+                            // Continue if sub-forks can't be fetched
                         }
-                        break;
                     }
 
-                    const pageData = await response.json();
-                    if (pageData.length === 0) break;
-
-                    for (const fork of pageData) {
-                        const forkData = {
-                            name: fork.full_name,
-                            owner: fork.owner.login,
-                            repo: fork.name,
-                            stars: fork.stargazers_count,
-                            url: fork.html_url,
-                            updated: new Date(fork.updated_at),
-                            children: []
-                        };
-
-                        // Fetch forks of forks (limit to avoid too many requests)
-                        if (forks.length < 20) {
-                            try {
-                                const subForks = await fetchSubForks(fork.owner.login, fork.name);
-                                forkData.children = subForks;
-                            } catch (e) {
-                                // Continue if sub-forks can't be fetched
-                            }
-                        }
-
-                        forks.push(forkData);
-                    }
-
-                    page++;
+                    forks.push(forkData);
                 }
-            } catch (error) {
-                console.log('Error fetching forks:', error.message);
-                // Return empty array - will show "No forks found" message
+
+                page++;
             }
 
             return forks.sort((a, b) => b.stars - a.stars);
@@ -606,7 +510,7 @@
             const forksDiv = document.getElementById('forks');
             
             if (forks.length === 0) {
-                forksDiv.innerHTML = '<div class="no-data">No forks found or fork access is restricted</div>';
+                forksDiv.innerHTML = '<div class="no-data">No forks found</div>';
                 return;
             }
 
